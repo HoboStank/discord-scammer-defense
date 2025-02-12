@@ -57,9 +57,15 @@ graph TD
 ## Technology Stack
 
 ### Backend
-- Node.js (Discord Bot)
+- Python with discord.py (Discord Bot)
+  - Chosen for excellent image processing capabilities (PIL, OpenCV)
+  - Strong machine learning potential for future features
+  - Clean async/await syntax for Discord events
 - Python/Flask (API Server)
 - PostgreSQL (Database)
+  - Robust JSON support for flexible profile data
+  - Built-in full-text search for username similarity
+  - Strong data integrity and scaling capabilities
 - Redis (Caching)
 
 ### Frontend
