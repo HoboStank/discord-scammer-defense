@@ -11,7 +11,7 @@ import json
 logger = logging.getLogger('dsd_bot.db')
 
 # Get database URL from environment variable
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres123@db:5432/dsd_db')
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres123@localhost:5432/dsd_db')
 
 # Create engine
 engine = create_engine(DATABASE_URL)
