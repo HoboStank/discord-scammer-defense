@@ -32,8 +32,7 @@ class DSDBot(commands.Bot):
             'cogs.detection',    # Scammer detection logic
             'cogs.moderation',   # Moderation commands
             'cogs.appeals',      # Appeal system
-            'cogs.admin',        # Admin commands
-            'cogs.help'          # Help command
+            'cogs.admin'         # Admin commands
         ]
 
     async def setup_hook(self):

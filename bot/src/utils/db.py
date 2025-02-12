@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from contextlib import contextmanager
@@ -42,11 +42,11 @@ async def store_scammer(discord_id: str, username: str, detection_score: float, 
     try:
         with get_db() as db:
             # Check if scammer already exists
-            query = """
+            query = text("""
                 INSERT INTO scammer_profiles 
                     (discord_id, username, detection_score, detection_reasons, avatar_hash, profile_data, last_updated)
                 VALUES 
-                    (%s, %s, %s, %s, %s, %s, %s)
+                    (:discord_id, :username, :score, :reasons, :avatar_hash, :profile_data, :updated_at)
                 ON CONFLICT (discord_id) 
                 DO UPDATE SET 
                     username = EXCLUDED.username,
@@ -56,18 +56,18 @@ async def store_scammer(discord_id: str, username: str, detection_score: float, 
                     profile_data = EXCLUDED.profile_data,
                     last_updated = EXCLUDED.last_updated
                 RETURNING id;
-            """
+            """)
             result = db.execute(
                 query,
-                (
-                    discord_id,
-                    username,
-                    detection_score,
-                    json.dumps(detection_reasons),
-                    avatar_hash,
-                    json.dumps(profile_data) if profile_data else None,
-                    datetime.utcnow()
-                )
+                {
+                    "discord_id": discord_id,
+                    "username": username,
+                    "score": detection_score,
+                    "reasons": json.dumps(detection_reasons),
+                    "avatar_hash": avatar_hash,
+                    "profile_data": json.dumps(profile_data) if profile_data else None,
+                    "updated_at": datetime.utcnow()
+                }
             )
             scammer_id = result.fetchone()[0]
             logger.info(f"Stored/updated scammer profile for {username} (ID: {discord_id})")
@@ -140,8 +140,8 @@ async def check_existing_scammer(discord_id: str):
     """Check if a user is already marked as a scammer."""
     try:
         with get_db() as db:
-            query = "SELECT * FROM scammer_profiles WHERE discord_id = %s;"
-            result = db.execute(query, (discord_id,))
+            query = text("SELECT * FROM scammer_profiles WHERE discord_id = :discord_id")
+            result = db.execute(query, {"discord_id": discord_id})
             scammer = result.fetchone()
             return dict(scammer) if scammer else None
     except Exception as e:
