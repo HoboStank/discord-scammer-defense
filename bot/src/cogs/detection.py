@@ -9,6 +9,7 @@ from PIL import Image
 import imagehash
 import re
 import unicodedata
+from utils.db import store_scammer, log_detection, get_server_config, check_existing_scammer
 
 logger = logging.getLogger('dsd_bot.detection')
 
@@ -235,6 +236,12 @@ class Detection(commands.Cog):
         # Skip checks if user is the server owner
         if member.id == member.guild.owner_id:
             return [], 0
+            
+        # Check if user is already marked as a scammer
+        existing_scammer = await check_existing_scammer(str(member.id))
+        if existing_scammer:
+            suspicious_factors.append(f"Previously detected as scammer with score: {existing_scammer['detection_score']:.1%}")
+            risk_level += 5  # High risk for previously detected scammers
 
         # Check account age
         account_age = datetime.datetime.now(datetime.timezone.utc) - member.created_at
@@ -362,6 +369,40 @@ class Detection(commands.Cog):
             
         async with ctx.typing():
             factors, risk = await self.check_user(member)
+            
+            # Store detection if risk is significant
+            if risk >= 2:
+                # Get avatar hash if available
+                avatar_hash = str(member.display_avatar.key) if member.display_avatar else None
+                
+                # Collect profile data
+                profile_data = {
+                    "nick": member.nick,
+                    "roles": [role.name for role in member.roles],
+                    "joined_at": member.joined_at.isoformat() if member.joined_at else None,
+                    "created_at": member.created_at.isoformat(),
+                    "bot": member.bot,
+                    "system": member.system
+                }
+                
+                # Store in database
+                scammer_id = await store_scammer(
+                    str(member.id),
+                    member.name,
+                    risk / 10,  # Convert risk to 0-1 scale
+                    factors,
+                    avatar_hash,
+                    profile_data
+                )
+                
+                # Log the detection event
+                if scammer_id:
+                    await log_detection(
+                        scammer_id,
+                        str(ctx.guild.id),
+                        risk / 10,
+                        factors
+                    )
             
             embed = discord.Embed(
                 title="🔍 Scan Results",
