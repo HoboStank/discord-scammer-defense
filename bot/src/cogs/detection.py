@@ -39,7 +39,7 @@ class Detection(commands.Cog):
         risk_level = 0
 
         # Check account age
-        account_age = datetime.datetime.utcnow() - member.created_at
+        account_age = datetime.datetime.now(datetime.timezone.utc) - member.created_at
         if account_age.days < 7:
             suspicious_factors.append(f"New account ({account_age.days} days old)")
             risk_level += 2

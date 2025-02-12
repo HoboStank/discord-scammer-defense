@@ -23,7 +23,7 @@ intents.presences = True       # For tracking user status changes
 class DSDBot(commands.Bot):
     def __init__(self):
         super().__init__(
-            command_prefix=['!dsd ', '!dsd', 'dsd '],  # Multiple prefix options
+            command_prefix='!dsd',  # Command prefix
             case_insensitive=True,  # Make commands case-insensitive
             intents=intents,
             description='Discord Scammer Defense Bot'
