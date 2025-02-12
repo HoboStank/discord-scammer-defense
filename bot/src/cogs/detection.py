@@ -204,7 +204,7 @@ class Detection(commands.Cog):
         all_text = [member.name]
         if member.nick:
             all_text.append(member.nick)
-        all_text.extend(member_activities)
+        all_text.extend(member_texts)
         
         for text in all_text:
             patterns = await self.check_suspicious_patterns(text)
@@ -237,8 +237,30 @@ class Detection(commands.Cog):
 
     @commands.command(name='scan')
     @commands.has_permissions(manage_messages=True)
-    async def scan_user(self, ctx, member: discord.Member):
+    async def scan_user(self, ctx, *, member_name: str):
         """Manually scan a user for potential scammer indicators."""
+        # Try to find the member by name, ID, or mention
+        member = None
+        
+        # Remove mention formatting if present
+        member_name = member_name.strip('<@!>')
+        
+        # Try to find by ID first
+        if member_name.isdigit():
+            member = ctx.guild.get_member(int(member_name))
+            
+        # If not found, try by name
+        if not member:
+            member = discord.utils.find(
+                lambda m: m.name.lower() == member_name.lower() or 
+                         (m.nick and m.nick.lower() == member_name.lower()),
+                ctx.guild.members
+            )
+            
+        if not member:
+            await ctx.send(f"❌ Could not find member: {member_name}")
+            return
+            
         async with ctx.typing():
             factors, risk = await self.check_user(member)
             
