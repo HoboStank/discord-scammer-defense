@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  bot:
+    build:
+      context: ./bot
+      dockerfile: ../docker/bot.Dockerfile
+    volumes:
+      - ./bot:/usr/src/app
+    environment:
+      - NODE_ENV=development
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+    depends_on:
+      - api
+      - db
+
+  api:
+    build:
+      context: ./api
+      dockerfile: ../docker/api.Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./api:/usr/src/app
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/dsd
+    depends_on:
+      - db
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: ../docker/dashboard.Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./dashboard:/usr/src/app
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000
+    depends_on:
+      - api
+
+  db:
+    image: postgres:13-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=dsd
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:
