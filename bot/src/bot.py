@@ -28,10 +28,47 @@ class DSDBot(commands.Bot):
             intents=intents,
             description='Discord Scammer Defense Bot'
         )
+        self.initial_extensions = [
+            'cogs.detection',    # Scammer detection logic
+            'cogs.moderation',   # Moderation commands
+            'cogs.appeals',      # Appeal system
+            'cogs.admin'         # Admin commands
+        ]
+
+    async def setup_hook(self):
+        """Setup hook that runs when the bot starts."""
+        self.color = discord.Color.blue()
+        for ext in self.initial_extensions:
+            try:
+                await self.load_extension(ext)
+                logger.info(f'Loaded extension: {ext}')
+            except Exception as e:
+                logger.error(f'Failed to load extension {ext}: {e}')
+
+    async def on_ready(self):
+        """Event that fires when the bot is ready."""
+        logger.info(f'Logged in as {self.user.name} (ID: {self.user.id})')
+        logger.info(f'Connected to {len(self.guilds)} guilds')
         
-    async def get_prefix(self, message):
-        """Get the prefix for the bot."""
-        return ['!dsd ', '!dsd', 'dsd ']
+        # Set bot status
+        await self.change_presence(
+            activity=discord.Activity(
+                type=discord.ActivityType.watching,
+                name='for scammers | !dsd help'
+            )
+        )
+
+    async def on_command_error(self, ctx, error):
+        """Handle command errors."""
+        if isinstance(error, commands.MissingPermissions):
+            await ctx.send("❌ You don't have permission to use this command.")
+        elif isinstance(error, commands.MissingRequiredArgument):
+            await ctx.send("❌ Missing required argument. Use `!dsd help` for command usage.")
+        elif isinstance(error, commands.CommandNotFound):
+            await ctx.send("❌ Command not found. Use `!dsd help` to see available commands.")
+        else:
+            logger.error(f"Command error: {error}")
+            await ctx.send("❌ An error occurred while executing the command.")
 
     @commands.command(name='help')
     async def help_command(self, ctx, command_name: str = None):
@@ -71,68 +108,6 @@ class DSDBot(commands.Bot):
 
         embed.set_footer(text="Use !dsd help <command> for more details about a command")
         await ctx.send(embed=embed)
-
-    def __init__(self):
-        super().__init__(
-            command_prefix=['!dsd ', '!dsd', 'dsd '],  # Multiple prefix options
-            case_insensitive=True,  # Make commands case-insensitive
-            intents=intents,
-            description='Discord Scammer Defense Bot'
-        )
-        self.initial_extensions = [
-            'cogs.detection',    # Scammer detection logic
-            'cogs.moderation',   # Moderation commands
-            'cogs.appeals',      # Appeal system
-            'cogs.admin'         # Admin commands
-        ]
-
-    async def setup_hook(self):
-        """Setup hook that runs when the bot starts."""
-        for ext in self.initial_extensions:
-            try:
-                await self.load_extension(ext)
-                logger.info(f'Loaded extension: {ext}')
-            except Exception as e:
-                logger.error(f'Failed to load extension {ext}: {e}')
-
-    async def on_ready(self):
-        """Event that fires when the bot is ready."""
-        logger.info(f'Logged in as {self.user.name} (ID: {self.user.id})')
-        logger.info(f'Connected to {len(self.guilds)} guilds')
-        
-        # Set bot status
-        await self.change_presence(
-            activity=discord.Activity(
-                type=discord.ActivityType.watching,
-                name='for scammers | !dsd help'
-            )
-        )
-
-    async def setup_hook(self):
-        """Initialize bot settings and load extensions."""
-        self.color = discord.Color.blue()
-        await super().setup_hook()
-
-    async def on_command_error(self, ctx, error):
-        """Handle command errors."""
-        if isinstance(error, commands.MissingPermissions):
-            await ctx.send("❌ You don't have permission to use this command.")
-        elif isinstance(error, commands.MissingRequiredArgument):
-            await ctx.send("❌ Missing required argument. Use `!dsd help` for command usage.")
-        else:
-            logger.error(f"Command error: {error}")
-            await ctx.send("❌ An error occurred while executing the command.")
-
-    async def on_member_join(self, member):
-        """Event that fires when a new member joins."""
-        logger.info(f'New member joined: {member.name}#{member.discriminator}')
-        # TODO: Implement scammer detection logic
-
-    async def on_member_update(self, before, after):
-        """Event that fires when a member updates their profile."""
-        if before.avatar != after.avatar or before.name != after.name:
-            logger.info(f'Member updated: {after.name}#{after.discriminator}')
-            # TODO: Implement profile change detection
 
 async def main():
     """Main function to start the bot."""
