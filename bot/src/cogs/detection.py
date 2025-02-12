@@ -8,6 +8,7 @@ from io import BytesIO
 from PIL import Image
 import imagehash
 import re
+import unicodedata
 
 logger = logging.getLogger('dsd_bot.detection')
 
