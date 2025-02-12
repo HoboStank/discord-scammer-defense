@@ -9,7 +9,9 @@ from PIL import Image
 import imagehash
 import re
 import unicodedata
-from utils.db import store_scammer, log_detection, get_server_config, check_existing_scammer
+from utils.db import store_scammer, log_detection, check_existing_scammer
+from utils.server_config import ServerConfig
+from utils.moderation import ModerationActions
 
 logger = logging.getLogger('dsd_bot.detection')
 
@@ -18,6 +20,8 @@ class Detection(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
+        self.mod_actions = ModerationActions(bot)
+        self.server_configs = {}  # Cache for server configs
         self.suspicious_patterns = [
             "free nitro",
             "steam gift",
@@ -228,6 +232,78 @@ class Detection(commands.Cog):
                 found_patterns.append(pattern)
         return found_patterns
 
+    async def get_server_config(self, guild_id: str) -> ServerConfig:
+        """Get server configuration, using cache if available."""
+        if guild_id not in self.server_configs:
+            config = ServerConfig(guild_id)
+            await config.load()
+            self.server_configs[guild_id] = config
+        return self.server_configs[guild_id]
+
+    async def handle_detection(self, member: discord.Member, risk_level: float, factors: list):
+        """Handle detection of a potential scammer."""
+        config = await self.get_server_config(str(member.guild.id))
+        
+        # Check if member has immunity
+        if config.is_immune(member.roles):
+            return
+        
+        # Store in database if risk is significant
+        if risk_level >= config.get('min_detection_score', 0.7):
+            scammer_id = await store_scammer(
+                str(member.id),
+                member.name,
+                risk_level / 10,  # Convert to 0-1 scale
+                factors,
+                str(member.display_avatar.key) if member.display_avatar else None,
+                {
+                    "nick": member.nick,
+                    "roles": [role.name for role in member.roles],
+                    "joined_at": member.joined_at.isoformat() if member.joined_at else None,
+                    "created_at": member.created_at.isoformat(),
+                    "bot": member.bot,
+                    "system": member.system
+                }
+            )
+            
+            if scammer_id:
+                await log_detection(
+                    scammer_id,
+                    str(member.guild.id),
+                    risk_level / 10,
+                    factors
+                )
+        
+        # Determine and take action based on risk level
+        action = await config.should_take_action(risk_level / 10)
+        if action:
+            reason = f"Automatic action - Risk Level: {risk_level}/10\nFactors:\n" + "\n".join(f"- {f}" for f in factors)
+            
+            if action == 'warn':
+                await self.mod_actions.warn_user(member, reason)
+            elif action == 'kick':
+                await self.mod_actions.kick_user(member, reason)
+            elif action == 'ban':
+                await self.mod_actions.ban_user(member, reason)
+            
+            # Send alert to designated channel
+            alert_channel_id = config.get('alert_channel')
+            if alert_channel_id:
+                try:
+                    channel = member.guild.get_channel(int(alert_channel_id))
+                    if channel:
+                        embed = discord.Embed(
+                            title="🚨 Automatic Action Taken",
+                            description=f"Action taken against {member.mention}",
+                            color=discord.Color.red()
+                        )
+                        embed.add_field(name="Action", value=action.upper(), inline=True)
+                        embed.add_field(name="Risk Level", value=f"{risk_level}/10", inline=True)
+                        embed.add_field(name="Factors", value="\n".join(f"• {f}" for f in factors), inline=False)
+                        await channel.send(embed=embed)
+                except Exception as e:
+                    logger.error(f"Error sending alert: {e}")
+
     async def check_user(self, member: discord.Member) -> tuple:
         """Check a user against known patterns and staff profiles."""
         suspicious_factors = []
@@ -330,7 +406,22 @@ class Detection(commands.Cog):
         factors, risk = await self.check_user(member)
         
         if risk > 0:
-            channel = member.guild.system_channel or next((ch for ch in member.guild.text_channels if ch.permissions_for(member.guild.me).send_messages), None)
+            # Get server config
+            config = await self.get_server_config(str(member.guild.id))
+            
+            # Send alert to configured channel or fallback to system channel
+            alert_channel_id = config.get('alert_channel')
+            channel = None
+            
+            if alert_channel_id:
+                channel = member.guild.get_channel(int(alert_channel_id))
+            
+            if not channel:
+                channel = member.guild.system_channel or next(
+                    (ch for ch in member.guild.text_channels if ch.permissions_for(member.guild.me).send_messages),
+                    None
+                )
+            
             if channel:
                 embed = discord.Embed(
                     title="⚠️ Potential Scammer Detected",
@@ -340,6 +431,9 @@ class Detection(commands.Cog):
                 embed.add_field(name="Suspicious Factors", value='\n'.join(f"• {f}" for f in factors) or "None")
                 embed.set_footer(text=f"User ID: {member.id}")
                 await channel.send(embed=embed)
+            
+            # Handle detection (auto-moderation)
+            await self.handle_detection(member, risk, factors)
 
     @commands.command(name='scan')
     @commands.has_permissions(manage_messages=True)
