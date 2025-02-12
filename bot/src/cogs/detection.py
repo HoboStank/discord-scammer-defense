@@ -55,24 +55,66 @@ class Detection(commands.Cog):
         actual_diff = hash1 - hash2
         return 1 - (actual_diff / max_diff)
 
-    async def compare_usernames(self, name1: str, name2: str) -> float:
-        """Compare two usernames for similarity."""
+    async def compare_usernames(self, name1: str, name2: str) -> tuple[float, list[str]]:
+        """Compare two usernames for similarity and return score and reasons."""
+        reasons = []
+        
         # Clean and normalize usernames
         clean1 = re.sub(r'[^a-zA-Z0-9]', '', name1.lower())
         clean2 = re.sub(r'[^a-zA-Z0-9]', '', name2.lower())
         
         # Return 0 if one of the names is empty after cleaning
         if not clean1 or not clean2:
-            return 0.0
+            return 0.0, reasons
+            
+        # Check for exact match after cleaning
+        if clean1 == clean2:
+            reasons.append("identical after removing special characters")
+            return 1.0, reasons
+            
+        # Check for character replacement (0/O, l/I, etc.)
+        char_replacements = {
+            'o': '0',
+            'l': '1',
+            'i': '1',
+            'e': '3',
+            'a': '4',
+            's': '5',
+            't': '7',
+            'b': '8',
+            'g': '9'
+        }
+        
+        test1 = clean1
+        test2 = clean2
+        for char, num in char_replacements.items():
+            test1 = test1.replace(char, num)
+            test2 = test2.replace(char, num)
+        
+        if test1 == test2:
+            reasons.append("identical after checking number/letter substitutions")
+            return 0.95, reasons
+            
+        # Check for repeated characters (e.g., Hobo vs Hoboo)
+        stripped1 = re.sub(r'(.)\1+', r'\1', clean1)
+        stripped2 = re.sub(r'(.)\1+', r'\1', clean2)
+        
+        if stripped1 == stripped2:
+            reasons.append("identical after removing repeated characters")
+            return 0.9, reasons
             
         # Calculate basic similarity
         basic_ratio = ratio(clean1, clean2)
         
         # Check for substring relationship
         if clean1 in clean2 or clean2 in clean1:
-            return max(basic_ratio, 0.8)  # At least 80% match if one is substring of other
+            reasons.append("one name contains the other")
+            return max(basic_ratio, 0.8), reasons
             
-        return basic_ratio
+        if basic_ratio > 0.7:
+            reasons.append("general text similarity")
+            
+        return basic_ratio, reasons
 
     async def compare_text(self, text1: str, text2: str) -> float:
         """Compare two text strings for similarity."""
@@ -111,10 +153,17 @@ class Detection(commands.Cog):
         owner = member.guild.owner
         
         # Username comparison
-        owner_name_similarity = await self.compare_usernames(member.name, owner.name)
-        if owner_name_similarity > 0.7:
-            suspicious_factors.append(f"Username similar to server owner ({owner_name_similarity:.1%} match)")
+        name_similarity, name_reasons = await self.compare_usernames(member.name, owner.name)
+        if name_similarity > 0.7:
+            suspicious_factors.append(f"Username similar to server owner ({name_similarity:.1%} match): {', '.join(name_reasons)}")
             risk_level += 3
+            
+        # Also check nickname if present
+        if member.nick:
+            nick_similarity, nick_reasons = await self.compare_usernames(member.nick, owner.name)
+            if nick_similarity > 0.7:
+                suspicious_factors.append(f"Nickname similar to server owner ({nick_similarity:.1%} match): {', '.join(nick_reasons)}")
+                risk_level += 2
 
         # Avatar comparison
         member_avatar = await self.download_avatar(member.display_avatar.url)
@@ -126,14 +175,30 @@ class Detection(commands.Cog):
                 risk_level += 3
 
         # Bio/Status comparison
-        member_activities = [str(activity) for activity in member.activities if activity.type == discord.ActivityType.custom]
-        owner_activities = [str(activity) for activity in owner.activities if activity.type == discord.ActivityType.custom]
+        def get_user_text(user):
+            texts = []
+            # Get custom status
+            activities = [str(activity) for activity in user.activities if activity.type == discord.ActivityType.custom]
+            texts.extend(activities)
+            # Get roles as text
+            roles_text = ' '.join(role.name for role in user.roles)
+            texts.append(roles_text)
+            return texts
+
+        member_texts = get_user_text(member)
+        owner_texts = get_user_text(owner)
         
-        if member_activities and owner_activities:
-            status_similarity = await self.compare_text(member_activities[0], owner_activities[0])
-            if status_similarity > 0.6:
-                suspicious_factors.append(f"Status message similar to server owner ({status_similarity:.1%} match)")
-                risk_level += 2
+        for member_text in member_texts:
+            for owner_text in owner_texts:
+                if member_text and owner_text:  # Skip empty texts
+                    status_similarity = await self.compare_text(member_text, owner_text)
+                    if status_similarity > 0.6:
+                        suspicious_factors.append(
+                            f"Profile text similar to server owner ({status_similarity:.1%} match)\n" +
+                            f"Owner text: '{owner_text}'\n" +
+                            f"Member text: '{member_text}'"
+                        )
+                        risk_level += 2
 
         # Check for suspicious patterns in all text fields
         all_text = [member.name]
