@@ -36,32 +36,127 @@ class Detection(commands.Cog):
                     return Image.open(BytesIO(data))
         return None
 
-    async def compare_images(self, img1: Image.Image, img2: Image.Image) -> float:
-        """Compare two images using perceptual hashing."""
+    async def compare_images(self, img1: Image.Image, img2: Image.Image) -> tuple[float, list[str]]:
+        """Compare two images using multiple methods."""
         if not img1 or not img2:
-            return 0.0
+            return 0.0, []
+
+        reasons = []
+        max_similarity = 0.0
         
         # Convert images to same size and mode for comparison
         size = (128, 128)
-        img1 = img1.resize(size).convert('RGB')
-        img2 = img2.resize(size).convert('RGB')
+        img1_resized = img1.resize(size).convert('RGB')
+        img2_resized = img2.resize(size).convert('RGB')
         
-        # Calculate perceptual hashes
-        hash1 = imagehash.average_hash(img1)
-        hash2 = imagehash.average_hash(img2)
+        # 1. Average Hash (overall similarity)
+        hash1 = imagehash.average_hash(img1_resized)
+        hash2 = imagehash.average_hash(img2_resized)
+        avg_similarity = 1 - (hash1 - hash2) / (len(hash1.hash) * len(hash1.hash))
         
-        # Calculate similarity (0 to 1, where 1 is identical)
-        max_diff = len(hash1.hash) * len(hash1.hash)  # Maximum possible difference
-        actual_diff = hash1 - hash2
-        return 1 - (actual_diff / max_diff)
+        # 2. Perceptual Hash (resistant to minor modifications)
+        phash1 = imagehash.phash(img1_resized)
+        phash2 = imagehash.phash(img2_resized)
+        phash_similarity = 1 - (phash1 - phash2) / (len(phash1.hash) * len(phash1.hash))
+        
+        # 3. Difference Hash (edge detection based)
+        dhash1 = imagehash.dhash(img1_resized)
+        dhash2 = imagehash.dhash(img2_resized)
+        dhash_similarity = 1 - (dhash1 - dhash2) / (len(dhash1.hash) * len(dhash1.hash))
+        
+        # 4. Color analysis
+        def get_dominant_colors(img):
+            img = img.resize((50, 50))  # Reduce size for faster processing
+            colors = img.getcolors(2500)  # Get all colors
+            if colors:
+                return sorted(colors, reverse=True)[:3]  # Top 3 colors
+            return []
+            
+        colors1 = get_dominant_colors(img1_resized)
+        colors2 = get_dominant_colors(img2_resized)
+        
+        # Compare color patterns
+        color_similarity = 0
+        if colors1 and colors2:
+            matches = sum(1 for c1 in colors1 for c2 in colors2 
+                        if abs(c1[1][0] - c2[1][0]) < 30 and  # R
+                           abs(c1[1][1] - c2[1][1]) < 30 and  # G
+                           abs(c1[1][2] - c2[1][2]) < 30)     # B
+            color_similarity = matches / max(len(colors1), len(colors2))
+
+        # Analyze results
+        if avg_similarity > 0.8:
+            reasons.append("very similar overall appearance")
+            max_similarity = max(max_similarity, avg_similarity)
+            
+        if phash_similarity > 0.8:
+            reasons.append("similar after minor modifications")
+            max_similarity = max(max_similarity, phash_similarity)
+            
+        if dhash_similarity > 0.8:
+            reasons.append("similar edge patterns")
+            max_similarity = max(max_similarity, dhash_similarity)
+            
+        if color_similarity > 0.7:
+            reasons.append("similar color scheme")
+            max_similarity = max(max_similarity, color_similarity)
+
+        return max_similarity, reasons
+
+    def normalize_unicode(self, text: str) -> str:
+        """Normalize Unicode characters to their closest ASCII representation."""
+        # Common Unicode tricks used by scammers
+        unicode_map = {
+            'а': 'a',  # Cyrillic
+            'е': 'e',  # Cyrillic
+            'і': 'i',  # Cyrillic
+            'о': 'o',  # Cyrillic
+            'р': 'p',  # Cyrillic
+            'с': 'c',  # Cyrillic
+            'у': 'y',  # Cyrillic
+            'ѕ': 's',  # Cyrillic
+            '𝐚': 'a',  # Mathematical
+            '𝐛': 'b',  # Mathematical
+            '𝐨': 'o',  # Mathematical
+            '𝓪': 'a',  # Script
+            '𝓫': 'b',  # Script
+            '𝓸': 'o',  # Script
+            '𝔞': 'a',  # Fraktur
+            '𝔟': 'b',  # Fraktur
+            '𝔬': 'o',  # Fraktur
+            # Add more as needed
+        }
+        
+        # Replace Unicode characters
+        normalized = text.lower()
+        for unicode_char, ascii_char in unicode_map.items():
+            normalized = normalized.replace(unicode_char, ascii_char)
+            
+        # Remove zero-width characters and other invisible Unicode
+        normalized = re.sub(r'[\u200B-\u200D\uFEFF]', '', normalized)
+        
+        # Remove combining diacritical marks
+        normalized = ''.join(c for c in normalized if not unicodedata.combining(c))
+        
+        return normalized
 
     async def compare_usernames(self, name1: str, name2: str) -> tuple[float, list[str]]:
         """Compare two usernames for similarity and return score and reasons."""
         reasons = []
         
+        # Normalize Unicode characters first
+        norm1 = self.normalize_unicode(name1)
+        norm2 = self.normalize_unicode(name2)
+        
+        # Check for Unicode tricks
+        if norm1 != name1.lower() or norm2 != name2.lower():
+            reasons.append("using special Unicode characters")
+            if norm1 == norm2:
+                return 1.0, reasons
+        
         # Clean and normalize usernames
-        clean1 = re.sub(r'[^a-zA-Z0-9]', '', name1.lower())
-        clean2 = re.sub(r'[^a-zA-Z0-9]', '', name2.lower())
+        clean1 = re.sub(r'[^a-zA-Z0-9]', '', norm1)
+        clean2 = re.sub(r'[^a-zA-Z0-9]', '', norm2)
         
         # Return 0 if one of the names is empty after cleaning
         if not clean1 or not clean2:
@@ -169,10 +264,13 @@ class Detection(commands.Cog):
         member_avatar = await self.download_avatar(member.display_avatar.url)
         owner_avatar = await self.download_avatar(owner.display_avatar.url)
         if member_avatar and owner_avatar:
-            avatar_similarity = await self.compare_images(member_avatar, owner_avatar)
-            if avatar_similarity > 0.8:
-                suspicious_factors.append(f"Avatar similar to server owner ({avatar_similarity:.1%} match)")
-                risk_level += 3
+            similarity, reasons = await self.compare_images(member_avatar, owner_avatar)
+            if similarity > 0.7:
+                suspicious_factors.append(
+                    f"Avatar similar to server owner ({similarity:.1%} match):\n" +
+                    "\n".join(f"• {r}" for r in reasons)
+                )
+                risk_level += len(reasons)  # More matching aspects = higher risk
 
         # Bio/Status comparison
         def get_user_text(user):
