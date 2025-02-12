@@ -56,6 +56,21 @@ class DSDBot(commands.Bot):
             )
         )
 
+    async def setup_hook(self):
+        """Initialize bot settings and load extensions."""
+        self.color = discord.Color.blue()
+        await super().setup_hook()
+
+    async def on_command_error(self, ctx, error):
+        """Handle command errors."""
+        if isinstance(error, commands.MissingPermissions):
+            await ctx.send("❌ You don't have permission to use this command.")
+        elif isinstance(error, commands.MissingRequiredArgument):
+            await ctx.send("❌ Missing required argument. Use `!dsd help` for command usage.")
+        else:
+            logger.error(f"Command error: {error}")
+            await ctx.send("❌ An error occurred while executing the command.")
+
     async def on_member_join(self, member):
         """Event that fires when a new member joins."""
         logger.info(f'New member joined: {member.name}#{member.discriminator}')
