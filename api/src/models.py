@@ -105,4 +105,4 @@ class ModLog(Base):
     
     # Additional data
     duration = Column(Integer)  # For temporary actions (mutes, bans)
-    metadata = Column(JSON)    # Any additional context
+    extra_data = Column(JSON)    # Any additional context (renamed from metadata)

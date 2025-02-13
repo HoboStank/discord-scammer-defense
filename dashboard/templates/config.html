@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-container">
+    <section class="config-section">
+        <h2>Server Configuration</h2>
+        <form id="configForm" class="config-form" method="POST" action="/api/config/save">
+            <div class="config-group">
+                <h3>Detection Settings</h3>
+                <div class="form-group">
+                    <label for="minDetectionScore">Minimum Detection Score</label>
+                    <input 
+                        type="range" 
+                        id="minDetectionScore" 
+                        name="min_detection_score" 
+                        min="0" 
+                        max="1" 
+                        step="0.05"
+                        value="{{ config.min_detection_score }}"
+                    >
+                    <span class="score-display">{{ "%.2f"|format(config.min_detection_score) }}</span>
+                </div>
+
+                <div class="form-group">
+                    <label>Enabled Checks</label>
+                    <div class="checkbox-group">
+                        {% for check in available_checks %}
+                        <label class="checkbox-label">
+                            <input 
+                                type="checkbox" 
+                                name="enabled_checks" 
+                                value="{{ check.id }}"
+                                {% if check.id in config.enabled_checks %}checked{% endif %}
+                            >
+                            {{ check.name }}
+                            <span class="check-description">{{ check.description }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="config-group">
+                <h3>Automatic Actions</h3>
+                <div class="action-thresholds">
+                    <div class="form-group">
+                        <label for="warnThreshold">Warning Threshold</label>
+                        <input 
+                            type="range" 
+                            id="warnThreshold" 
+                            name="warn_threshold" 
+                            min="0" 
+                            max="1" 
+                            step="0.05"
+                            value="{{ config.auto_actions.warn }}"
+                        >
+                        <span class="score-display">{{ "%.2f"|format(config.auto_actions.warn) }}</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="kickThreshold">Kick Threshold</label>
+                        <input 
+                            type="range" 
+                            id="kickThreshold" 
+                            name="kick_threshold" 
+                            min="0" 
+                            max="1" 
+                            step="0.05"
+                            value="{{ config.auto_actions.kick }}"
+                        >
+                        <span class="score-display">{{ "%.2f"|format(config.auto_actions.kick) }}</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="banThreshold">Ban Threshold</label>
+                        <input 
+                            type="range" 
+                            id="banThreshold" 
+                            name="ban_threshold" 
+                            min="0" 
+                            max="1" 
+                            step="0.05"
+                            value="{{ config.auto_actions.ban }}"
+                        >
+                        <span class="score-display">{{ "%.2f"|format(config.auto_actions.ban) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="config-group">
+                <h3>Channel Settings</h3>
+                <div class="form-group">
+                    <label for="alertChannel">Alert Channel</label>
+                    <select id="alertChannel" name="alert_channel">
+                        <option value="">Select a channel...</option>
+                        {% for channel in channels %}
+                        <option 
+                            value="{{ channel.id }}"
+                            {% if channel.id == config.alert_channel %}selected{% endif %}
+                        >
+                            #{{ channel.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="logChannel">Log Channel</label>
+                    <select id="logChannel" name="log_channel">
+                        <option value="">Select a channel...</option>
+                        {% for channel in channels %}
+                        <option 
+                            value="{{ channel.id }}"
+                            {% if channel.id == config.log_channel %}selected{% endif %}
+                        >
+                            #{{ channel.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="config-group">
+                <h3>Role Settings</h3>
+                <div class="form-group">
+                    <label>Trusted Roles</label>
+                    <div class="role-select">
+                        {% for role in roles %}
+                        <label class="role-label">
+                            <input 
+                                type="checkbox" 
+                                name="trusted_roles" 
+                                value="{{ role.id }}"
+                                {% if role.id in config.trusted_roles %}checked{% endif %}
+                            >
+                            <span class="role-name" style="color: {{ role.color }}">{{ role.name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Immune Roles</label>
+                    <div class="role-select">
+                        {% for role in roles %}
+                        <label class="role-label">
+                            <input 
+                                type="checkbox" 
+                                name="immune_roles" 
+                                value="{{ role.id }}"
+                                {% if role.id in config.immune_roles %}checked{% endif %}
+                            >
+                            <span class="role-name" style="color: {{ role.color }}">{{ role.name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="save-button">Save Changes</button>
+                <button type="reset" class="reset-button">Reset</button>
+            </div>
+        </form>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Update score displays when sliders change
+    const sliders = document.querySelectorAll('input[type="range"]');
+    sliders.forEach(slider => {
+        slider.addEventListener('input', function() {
+            this.nextElementSibling.textContent = parseFloat(this.value).toFixed(2);
+        });
+    });
+
+    // Form submission handling
+    const form = document.getElementById('configForm');
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        
+        try {
+            const response = await fetch('/api/config/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                showNotification('Configuration saved successfully', 'success');
+            } else {
+                showNotification('Failed to save configuration', 'error');
+            }
+        } catch (error) {
+            showNotification('An error occurred while saving', 'error');
+        }
+    });
+});
+
+function showNotification(message, type) {
+    // Implementation of notification display
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+</script>
+{% endblock %}
+
+{% block styles %}
+<style>
+.config-section {
+    background-color: var(--surface-color);
+    padding: var(--spacing-lg);
+    border-radius: var(--border-radius);
+}
+
+.config-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.config-group {
+    background-color: var(--secondary-color);
+    padding: var(--spacing-lg);
+    border-radius: var(--border-radius);
+}
+
+.form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-muted);
+}
+
+input[type="range"] {
+    width: 100%;
+    margin-right: var(--spacing-md);
+}
+
+.score-display {
+    display: inline-block;
+    min-width: 3em;
+    text-align: right;
+}
+
+.checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+}
+
+.check-description {
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
+.role-select {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--spacing-sm);
+}
+
+.role-label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background-color: var(--surface-color);
+    border-radius: var(--border-radius);
+}
+
+.form-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+}
+
+.save-button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.reset-button {
+    background-color: var(--surface-color);
+    color: var(--text-color);
+    border: 1px solid var(--text-muted);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.save-button:hover,
+.reset-button:hover {
+    opacity: 0.9;
+}
+
+.notification {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius);
+    color: white;
+    animation: slideIn 0.3s ease-out;
+}
+
+.notification.success {
+    background-color: var(--success-color);
+}
+
+.notification.error {
+    background-color: var(--danger-color);
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+</style>
+{% endblock %}

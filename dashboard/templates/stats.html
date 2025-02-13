@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-container">
+    <section class="stats-overview">
+        <h2>Server Overview</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Scans</h3>
+                <div class="stat-value">{{ stats.total_scans }}</div>
+                <div class="trend {% if stats.scan_trend > 0 %}up{% elif stats.scan_trend < 0 %}down{% endif %}">
+                    {{ stats.scan_trend }}% from last period
+                </div>
+            </div>
+            <div class="stat-card">
+                <h3>Detected Scammers</h3>
+                <div class="stat-value text-danger">{{ stats.detected_scammers }}</div>
+                <div class="trend {% if stats.scammer_trend > 0 %}up{% elif stats.scammer_trend < 0 %}down{% endif %}">
+                    {{ stats.scammer_trend }}% from last period
+                </div>
+            </div>
+            <div class="stat-card">
+                <h3>False Positives</h3>
+                <div class="stat-value text-warning">{{ stats.false_positives }}</div>
+                <div class="trend {% if stats.false_positive_trend < 0 %}up{% elif stats.false_positive_trend > 0 %}down{% endif %}">
+                    {{ stats.false_positive_trend }}% from last period
+                </div>
+            </div>
+            <div class="stat-card">
+                <h3>Accuracy Rate</h3>
+                <div class="stat-value text-success">{{ "%.1f"|format(stats.accuracy_rate|float) }}%</div>
+                <div class="trend {% if stats.accuracy_trend > 0 %}up{% elif stats.accuracy_trend < 0 %}down{% endif %}">
+                    {{ stats.accuracy_trend }}% from last period
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="chart-grid">
+        <section class="chart-section">
+            <h2>Detection Trends</h2>
+            <div class="chart-container">
+                <canvas id="detectionTrends"></canvas>
+            </div>
+        </section>
+
+        <section class="chart-section">
+            <h2>Action Distribution</h2>
+            <div class="chart-container">
+                <canvas id="actionDistribution"></canvas>
+            </div>
+        </section>
+    </div>
+
+    <div class="chart-grid">
+        <section class="chart-section">
+            <h2>Hourly Activity</h2>
+            <div class="chart-container">
+                <canvas id="hourlyActivity"></canvas>
+            </div>
+        </section>
+
+        <section class="chart-section">
+            <h2>Detection Scores</h2>
+            <div class="chart-container">
+                <canvas id="scoreDistribution"></canvas>
+            </div>
+        </section>
+    </div>
+
+    <section class="recent-detections">
+        <div class="section-header">
+            <h2>Recent Detections</h2>
+            <div class="time-filter">
+                <select id="timeRange" onchange="updateDetections()">
+                    <option value="24h">Last 24 Hours</option>
+                    <option value="7d">Last 7 Days</option>
+                    <option value="30d" selected>Last 30 Days</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="activity-list">
+            {% for detection in recent_detections %}
+            <div class="activity-item">
+                <div class="activity-user">
+                    <img src="{{ detection.avatar_url }}" alt="User Avatar" class="user-avatar">
+                    <div class="user-info">
+                        <span class="username">{{ detection.username }}</span>
+                        <span class="user-id">{{ detection.user_id }}</span>
+                    </div>
+                </div>
+                <div class="activity-details">
+                    <span class="activity-time">{{ detection.timestamp|datetime }}</span>
+                    <span class="activity-type">
+                        {{ detection.action|title }}
+                        {% if detection.score >= 0.95 %}
+                        <span class="badge danger">High Risk</span>
+                        {% elif detection.score >= 0.75 %}
+                        <span class="badge warning">Medium Risk</span>
+                        {% else %}
+                        <span class="badge info">Low Risk</span>
+                        {% endif %}
+                    </span>
+                    <span class="activity-score">
+                        Score: {{ "%.2f"|format(detection.score|float) }}
+                    </span>
+                </div>
+                <div class="activity-status">
+                    {{ detection.status|title }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.chart-section {
+    background-color: var(--surface-color);
+    padding: var(--spacing-lg);
+    border-radius: var(--border-radius);
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+    margin-top: var(--spacing-md);
+}
+
+.trend {
+    font-size: 0.9em;
+    margin-top: var(--spacing-sm);
+}
+
+.trend.up {
+    color: var(--success-color);
+}
+
+.trend.up::before {
+    content: "↑ ";
+}
+
+.trend.down {
+    color: var(--danger-color);
+}
+
+.trend.down::before {
+    content: "↓ ";
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.time-filter select {
+    background-color: var(--surface-color);
+    color: var(--text-color);
+    border: 1px solid var(--text-muted);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius);
+}
+
+.activity-user {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+}
+
+.activity-details {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.activity-status {
+    padding: 0.25em 0.75em;
+    border-radius: var(--border-radius);
+    font-size: 0.9em;
+}
+
+.activity-status.active {
+    background-color: var(--danger-color);
+}
+
+.activity-status.reversed {
+    background-color: var(--text-muted);
+}
+
+.activity-status.appealed {
+    background-color: var(--warning-color);
+    color: #000;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCharts();
+});
+
+function initializeCharts() {
+    // Detection Trends Chart
+    const trendsCtx = document.getElementById('detectionTrends').getContext('2d');
+    new Chart(trendsCtx, {
+        type: 'line',
+        data: {{ detection_trend_data|tojson }},
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: true,
+                    text: 'Detection Trends Over Time'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Action Distribution Chart
+    const actionCtx = document.getElementById('actionDistribution').getContext('2d');
+    new Chart(actionCtx, {
+        type: 'doughnut',
+        data: {{ action_distribution_data|tojson }},
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right'
+                },
+                title: {
+                    display: true,
+                    text: 'Actions Taken Distribution'
+                }
+            }
+        }
+    });
+
+    // Hourly Activity Chart
+    const hourlyCtx = document.getElementById('hourlyActivity').getContext('2d');
+    new Chart(hourlyCtx, {
+        type: 'bar',
+        data: {{ hourly_activity_data|tojson }},
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                title: {
+                    display: true,
+                    text: 'Detections by Hour'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Score Distribution Chart
+    const scoreCtx = document.getElementById('scoreDistribution').getContext('2d');
+    new Chart(scoreCtx, {
+        type: 'bar',
+        data: {{ score_distribution_data|tojson }},
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                title: {
+                    display: true,
+                    text: 'Detection Score Distribution'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+async function updateDetections() {
+    const timeRange = document.getElementById('timeRange').value;
+    const response = await fetch(`/api/stats/recent-detections?timeRange=${timeRange}`);
+    const data = await response.json();
+    
+    const activityList = document.querySelector('.activity-list');
+    // Update the activity list with new data
+    // Implementation details...
+}
+</script>
+{% endblock %}

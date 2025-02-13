@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-container">
+    <section class="stats-overview">
+        <h2>System Overview</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Active Servers</h3>
+                <p class="stat-value">{{ stats.server_count }}</p>
+            </div>
+            <div class="stat-card">
+                <h3>Total Detections</h3>
+                <p class="stat-value">{{ stats.detection_count }}</p>
+            </div>
+            <div class="stat-card">
+                <h3>Pending Appeals</h3>
+                <p class="stat-value">{{ stats.pending_appeals }}</p>
+            </div>
+            <div class="stat-card">
+                <h3>Detection Rate</h3>
+                <p class="stat-value">{{ stats.detection_rate }}%</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="recent-activity">
+        <h2>Recent Activity</h2>
+        <div class="activity-list">
+            {% for activity in recent_activities %}
+            <div class="activity-item">
+                <span class="activity-time">{{ activity.timestamp }}</span>
+                <span class="activity-type">{{ activity.type }}</span>
+                <span class="activity-details">{{ activity.details }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="quick-actions">
+        <h2>Quick Actions</h2>
+        <div class="action-buttons">
+            <a href="/config" class="action-button">Configure Server</a>
+            <a href="/scammers" class="action-button">View Scammers</a>
+            <a href="/appeals" class="action-button">Review Appeals</a>
+            <a href="/stats" class="action-button">View Statistics</a>
+        </div>
+    </section>
+</div>
+{% endblock %}

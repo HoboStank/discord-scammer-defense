@@ -1,4 +1,8 @@
 import os
+import sys
+print(f"Python executable path: {sys.executable}")
+print(f"Python version: {sys.version}")
+
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -18,7 +22,8 @@ load_dotenv('config/.env')
 intents = discord.Intents.default()
 intents.message_content = True  # For reading message content
 intents.members = True         # For tracking member joins/updates
-intents.presences = True       # For tracking user status changes
+intents.presences = False      # Not needed since we don't track status
+intents.voice_states = False   # Disable voice features
 
 class DSDBot(commands.Bot):
     def __init__(self):
@@ -44,11 +49,13 @@ class DSDBot(commands.Bot):
                 logger.info(f'Loaded extension: {ext}')
             except Exception as e:
                 logger.error(f'Failed to load extension {ext}: {e}')
+        logger.info('All extensions loaded')
 
     async def on_ready(self):
         """Event that fires when the bot is ready."""
         logger.info(f'Logged in as {self.user.name} (ID: {self.user.id})')
         logger.info(f'Connected to {len(self.guilds)} guilds')
+        logger.info('Bot is ready and all cogs should be loaded')
         
         # Set bot status
         await self.change_presence(

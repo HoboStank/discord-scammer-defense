@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <h2>Login with Discord</h2>
+        <p class="auth-description">Sign in using your Discord account to access the dashboard.</p>
+        
+        <a href="{{ oauth_url }}" class="discord-login-button">
+            <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class="discord-icon">
+                <path d="M19.73 5.17c-1.45-.66-3-.93-4.65-1.17-.02 0-.03 0-.05.02-.14.26-.3.6-.4.86-1.46-.22-2.91-.22-4.34 0-.11-.26-.27-.6-.41-.86-.02-.02-.03-.02-.05-.02-1.65.24-3.2.5-4.65 1.17-.01 0-.02.01-.03.02-2.95 4.39-3.76 8.68-3.35 12.92 0 .02.01.04.03.05 1.94 1.42 3.8 2.28 5.63 2.85.02 0 .04 0 .06-.01.47-.64.89-1.32 1.25-2.02.02-.04 0-.08-.04-.09-.61-.23-1.2-.51-1.77-.83-.04-.02-.04-.08-.01-.11.12-.09.24-.19.35-.28.02-.02.05-.02.07-.01 3.77 1.72 7.86 1.72 11.58 0 .02-.01.05-.01.07.01.12.1.24.19.35.28.04.03.04.09-.01.11-.57.33-1.16.6-1.77.83-.04.01-.05.06-.04.09.37.7.79 1.38 1.25 2.02.02.01.04.01.06.01 1.84-.57 3.71-1.43 5.65-2.85.02-.01.03-.03.03-.05.48-4.98-.8-9.23-3.39-12.92 0-.01-.02-.02-.03-.02zM8.02 15.33c-1.12 0-2.03-1.03-2.03-2.28 0-1.25.89-2.28 2.03-2.28 1.15 0 2.04 1.03 2.03 2.28 0 1.25-.89 2.28-2.03 2.28zm7.5 0c-1.12 0-2.03-1.03-2.03-2.28 0-1.25.89-2.28 2.03-2.28 1.15 0 2.04 1.03 2.03 2.28 0 1.25-.89 2.28-2.03 2.28z"/>
+            </svg>
+            Continue with Discord
+        </a>
+
+        {% if error %}
+        <div class="auth-error">
+            {{ error }}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .auth-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 80vh;
+        padding: var(--spacing-lg);
+    }
+
+    .auth-card {
+        background-color: var(--surface-color);
+        padding: var(--spacing-lg);
+        border-radius: var(--border-radius);
+        text-align: center;
+        max-width: 400px;
+        width: 100%;
+    }
+
+    .auth-description {
+        color: var(--text-muted);
+        margin: var(--spacing-md) 0;
+    }
+
+    .discord-login-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--spacing-md);
+        background-color: var(--primary-color);
+        color: white;
+        padding: var(--spacing-md) var(--spacing-lg);
+        border-radius: var(--border-radius);
+        text-decoration: none;
+        font-weight: 500;
+        transition: opacity 0.2s;
+    }
+
+    .discord-login-button:hover {
+        opacity: 0.9;
+    }
+
+    .discord-icon {
+        fill: currentColor;
+    }
+
+    .auth-error {
+        margin-top: var(--spacing-md);
+        padding: var(--spacing-md);
+        background-color: var(--danger-color);
+        color: white;
+        border-radius: var(--border-radius);
+        font-size: 0.9rem;
+    }
+</style>
+{% endblock %}

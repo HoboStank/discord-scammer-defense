@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-container">
+    <section class="appeals-header">
+        <div class="header-content">
+            <h2>Appeal Management</h2>
+            <div class="filter-controls">
+                <select id="statusFilter" class="filter-select">
+                    <option value="all">All Status</option>
+                    <option value="pending" selected>Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+                <input type="text" id="searchInput" class="search-input" placeholder="Search by username or ID...">
+            </div>
+        </div>
+    </section>
+
+    <section class="appeals-list">
+        {% for appeal in appeals %}
+        <div class="appeal-card">
+            <div class="appeal-header">
+                <div class="user-info">
+                    <img src="{{ appeal.detection.avatar_url }}" alt="User Avatar" class="user-avatar">
+                    <div class="user-details">
+                        <span class="username">{{ appeal.detection.username }}</span>
+                        <span class="user-id">{{ appeal.user_id }}</span>
+                        <span class="appeal-date">Appealed {{ appeal.created_at|datetime }}</span>
+                    </div>
+                </div>
+                <div class="appeal-status {{ appeal.status }}">
+                    {{ appeal.status|title }}
+                </div>
+            </div>
+
+            <div class="appeal-content">
+                <div class="original-detection">
+                    <h4>Original Detection</h4>
+                    <div class="detection-details">
+                        <div class="detail-item">
+                            <span class="label">Detection Score:</span>
+                            <span class="value">{{ "%.2f"|format(appeal.detection.score) }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">Action Taken:</span>
+                            <span class="value action-badge {{ appeal.detection.action }}">
+                                {{ appeal.detection.action|title }}
+                            </span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">Detected:</span>
+                            <span class="value">{{ appeal.detection.detected_at|datetime }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="appeal-reason">
+                    <h4>Appeal Reason</h4>
+                    <p>{{ appeal.reason }}</p>
+                </div>
+
+                {% if appeal.evidence %}
+                <div class="appeal-evidence">
+                    <h4>Additional Evidence</h4>
+                    <div class="evidence-items">
+                        {% for item in appeal.evidence %}
+                        <div class="evidence-item">
+                            {% if item.type == 'image' %}
+                            <img src="{{ item.url }}" alt="Evidence Image" class="evidence-image">
+                            {% elif item.type == 'text' %}
+                            <p class="evidence-text">{{ item.content }}</p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if appeal.status == 'pending' %}
+                <div class="appeal-actions">
+                    <button class="approve-btn" onclick="handleAppeal('{{ appeal.id }}', 'approve')">
+                        Approve Appeal
+                    </button>
+                    <button class="reject-btn" onclick="handleAppeal('{{ appeal.id }}', 'reject')">
+                        Reject Appeal
+                    </button>
+                </div>
+                {% else %}
+                <div class="resolution-details">
+                    <span class="label">Resolved by:</span>
+                    <span class="value">{{ appeal.resolver.username }}</span>
+                    <span class="resolution-time">{{ appeal.resolved_at|datetime }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if not appeals %}
+        <div class="no-appeals">
+            <p>No appeals found matching the current filters.</p>
+        </div>
+        {% endif %}
+
+        <div class="pagination">
+            {% if page > 1 %}
+            <a href="?page={{ page - 1 }}&status={{ status }}" class="page-btn">Previous</a>
+            {% endif %}
+            
+            <span class="page-info">Page {{ page }} of {{ total_pages }}</span>
+            
+            {% if page < total_pages %}
+            <a href="?page={{ page + 1 }}&status={{ status }}" class="page-btn">Next</a>
+            {% endif %}
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.appeals-header {
+    background-color: var(--surface-color);
+    padding: var(--spacing-lg);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-lg);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+}
+
+.filter-controls {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+.filter-select, .search-input {
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    border: 1px solid var(--text-muted);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius);
+}
+
+.appeal-card {
+    background-color: var(--surface-color);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-md);
+    overflow: hidden;
+}
+
+.appeal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    background-color: var(--secondary-color);
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.username {
+    font-weight: 500;
+}
+
+.user-id, .appeal-date {
+    font-size: 0.9em;
+    color: var(--text-muted);
+}
+
+.appeal-status {
+    padding: 0.25em 0.75em;
+    border-radius: 1em;
+    font-weight: 500;
+}
+
+.appeal-status.pending { background-color: var(--warning-color); color: #000; }
+.appeal-status.approved { background-color: var(--success-color); }
+.appeal-status.rejected { background-color: var(--danger-color); }
+
+.appeal-content {
+    padding: var(--spacing-lg);
+}
+
+.original-detection {
+    background-color: var(--secondary-color);
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-md);
+}
+
+.detection-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-sm);
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.label {
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
+.appeal-reason {
+    margin-bottom: var(--spacing-md);
+}
+
+.evidence-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-sm);
+}
+
+.evidence-image {
+    width: 100%;
+    border-radius: var(--border-radius);
+}
+
+.evidence-text {
+    background-color: var(--secondary-color);
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius);
+}
+
+.appeal-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+}
+
+.approve-btn, .reject-btn {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--border-radius);
+    border: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.approve-btn {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.reject-btn {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.approve-btn:hover,
+.reject-btn:hover {
+    opacity: 0.9;
+}
+
+.resolution-details {
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--secondary-color);
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
+.no-appeals {
+    text-align: center;
+    padding: var(--spacing-lg);
+    color: var(--text-muted);
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+}
+
+.page-btn {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 0.5em 1em;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+}
+
+.page-info {
+    color: var(--text-muted);
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const statusFilter = document.getElementById('statusFilter');
+    const searchInput = document.getElementById('searchInput');
+
+    function applyFilters() {
+        const params = new URLSearchParams(window.location.search);
+        params.set('status', statusFilter.value);
+        if (searchInput.value) {
+            params.set('search', searchInput.value);
+        } else {
+            params.delete('search');
+        }
+        window.location.search = params.toString();
+    }
+
+    statusFilter.addEventListener('change', applyFilters);
+    
+    let searchTimeout;
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(applyFilters, 500);
+    });
+});
+
+async function handleAppeal(appealId, action) {
+    if (!confirm(`Are you sure you want to ${action} this appeal?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/appeals/${appealId}/${action}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            // Refresh the page to show updated status
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(`Failed to ${action} appeal: ${error.detail}`);
+        }
+    } catch (error) {
+        console.error(`Error ${action}ing appeal:`, error);
+        alert(`An error occurred while trying to ${action} the appeal`);
+    }
+}
+</script>
+{% endblock %}
