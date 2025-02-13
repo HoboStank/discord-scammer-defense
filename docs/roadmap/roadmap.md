@@ -31,27 +31,33 @@
 - [x] Create detection logging system
 - [x] Add pgAdmin interface
 
-## Phase 2: Core Features (Weeks 5-8)
+## Phase 2: Core Features (In Progress)
 
-### Week 5: Moderation System
-- [ ] Implement automated actions
-- [ ] Create notification system
-- [ ] Set up audit logging
-- [ ] Develop configuration system
+### Moderation System ✅
+- [x] Implement automated actions (warn/kick/ban)
+- [x] Create notification system with configurable channels
+- [x] Set up comprehensive audit logging
+- [x] Add role-based permissions (trusted/immune roles)
 
-### Week 6: Admin Dashboard - Basic
-- [ ] Create dashboard structure
-- [ ] Implement authentication
-- [ ] Build basic UI components
-- [ ] Add server configuration interface
+### Server Configuration ✅
+- [x] Per-server settings management
+- [x] Customizable detection thresholds
+- [x] Auto-moderation configuration
+- [x] Channel and role setup commands
 
-### Week 7: Testing & Integration
+### Logging System ✅
+- [x] Database logging for all actions
+- [x] Discord channel logging
+- [x] User history tracking
+- [x] Detailed audit trail
+
+### Testing & Integration (In Progress)
 - [ ] Write unit tests
 - [ ] Perform integration testing
 - [ ] Set up monitoring
 - [ ] Document test coverage
 
-### Week 8: Beta Release
+### Beta Release (Pending)
 - [ ] Deploy to staging
 - [ ] Conduct security audit
 - [ ] Prepare release documentation
